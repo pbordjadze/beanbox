@@ -1,0 +1,43 @@
+{
+  "name": "Beanbox (CI builds)",
+  "identifier": "com.pbordjadze.beanbox.source",
+  "subtitle": "Automatic builds of the main branch",
+  "iconURL": "https://raw.githubusercontent.com/pbordjadze/beanbox/sidestore/icon.png",
+  "website": "https://github.com/pbordjadze/beanbox",
+  "tintColor": "#E2542C",
+  "apps": [
+    {
+      "name": "Beanbox",
+      "bundleIdentifier": "com.pbordjadze.beanbox",
+      "developerName": "pbordjadze",
+      "subtitle": "Paper for every jelly bean",
+      "localizedDescription": "Match origami paper to jelly bean flavours. Measure sheets and beans from photos, get the best sheet for every flavour, and split look-alike beans into groups, entirely on device.",
+      "iconURL": "https://raw.githubusercontent.com/pbordjadze/beanbox/sidestore/icon.png",
+      "tintColor": "#E2542C",
+      "category": "utilities",
+      "versions": [
+        {
+          "version": "1.0.2",
+          "buildVersion": "2",
+          "date": "2026-10-04T03:44:51Z",
+          "localizedDescription": "CI: one macOS job per push \u2014 screenshots on branches, the IPA on main",
+          "downloadURL": "https://github.com/pbordjadze/beanbox/releases/download/build-2/BeanBox.ipa",
+          "size": 958139,
+          "minOSVersion": "26.0"
+        }
+      ],
+      "version": "1.0.2",
+      "versionDate": "2026-10-04T03:44:51Z",
+      "versionDescription": "CI: one macOS job per push \u2014 screenshots on branches, the IPA on main",
+      "downloadURL": "https://github.com/pbordjadze/beanbox/releases/download/build-2/BeanBox.ipa",
+      "size": 958139,
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSCameraUsageDescription": "Beanbox uses the camera to photograph paper and beans so it can measure their colours. Photos stay on your device."
+        }
+      }
+    }
+  ],
+  "news": []
+}

@@ -62,13 +62,14 @@ struct GroupChart: View {
         .chartYScale(domain: domain.y)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 6)) {
-                AxisGridLine()
+                // Solid hairlines: the default vertical rule is dashed, which reads as a threshold.
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 AxisValueLabel()
             }
         }
         .chartYAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) {
-                AxisGridLine()
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 AxisValueLabel()
             }
         }

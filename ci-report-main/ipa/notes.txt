@@ -1,0 +1,1 @@
+CI: one macOS job per push — screenshots on branches, the IPA on main

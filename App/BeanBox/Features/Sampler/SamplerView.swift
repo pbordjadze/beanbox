@@ -172,16 +172,28 @@ struct SamplerView: View {
         // Both kinds are marked: beans and paper measured in the same shot are the most
         // trustworthy comparison there is. This tab's own are drawn last, on top.
         let here = project.data.samples.filter { $0.photoID == photo.id && $0.tap != nil }
-        for sample in here.sorted(by: { ($0.kind == kind ? 1 : 0) < ($1.kind == kind ? 1 : 0) }) {
+        for sample in here where sample.kind != kind {
             guard let tap = sample.tap else { continue }
-            let mine = sample.kind == kind
-            let radius = max(tap.r * scale, 5)
-            let circle = Path(ellipseIn: CGRect(x: tap.x * scale - radius, y: tap.y * scale - radius, width: 2 * radius, height: 2 * radius))
-            Marks.ring(&context, circle, color: .white.opacity(mine ? 1 : 0.6), width: mine ? 2 : 1.5)
-            if mine {
-                Marks.tag(&context, sample.label, at: CGPoint(x: tap.x * scale, y: tap.y * scale - radius - 10), size: kind == .paper ? 11 : 10)
-            }
+            Marks.ring(&context, ring(tap, scale), color: .white.opacity(0.6), width: 1.5)
         }
+        // Flavour names are long: neighbours along a row take turns above and below their
+        // rings so they don't run into each other.
+        let mine = here.filter { $0.kind == kind }.sorted { ($0.tap?.x ?? 0) < ($1.tap?.x ?? 0) }
+        for (index, sample) in mine.enumerated() {
+            guard let tap = sample.tap else { continue }
+            Marks.ring(&context, ring(tap, scale), color: .white, width: 2)
+            let radius = max(tap.r * scale, 5)
+            let below = kind == .bean && index % 2 == 1
+            let name = sample.label.count > 16 ? String(sample.label.prefix(15)) + "…" : sample.label
+            Marks.tag(
+                &context, name, at: CGPoint(x: tap.x * scale, y: tap.y * scale + (below ? radius + 10 : -radius - 10)),
+                size: kind == .paper ? 11 : 10)
+        }
+    }
+
+    private func ring(_ tap: SampleRecord.Tap, _ scale: Double) -> Path {
+        let radius = max(tap.r * scale, 5)
+        return Path(ellipseIn: CGRect(x: tap.x * scale - radius, y: tap.y * scale - radius, width: 2 * radius, height: 2 * radius))
     }
 
     // MARK: Swatches
