@@ -20,7 +20,7 @@ final class Project {
     /// The last thing that went wrong, in words for the user; cleared by the next success.
     var problem: String?
 
-    @ObservationIgnored private let root: URL
+    private let root: URL
     @ObservationIgnored private var recent: [(id: UUID, photo: LoadedPhoto)] = []
 
     static var defaultRoot: URL {
@@ -48,7 +48,7 @@ final class Project {
         let urls = data.photos.map { ($0.id, url(of: $0.id)) }
         Task { [weak self] in
             for (id, url) in urls {
-                guard let thumbnail = await Self.thumbnail(url) else { continue }
+                guard let thumbnail = await Project.thumbnail(url) else { continue }
                 self?.thumbnails[id] = thumbnail
             }
         }

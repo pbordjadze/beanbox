@@ -18,12 +18,12 @@ struct SortView: View {
     @State private var isShowingMat = Launch.shows("mat")
     @State private var isShowingTips = false
 
-    enum Overlay: String, CaseIterable, Identifiable {
+    nonisolated enum Overlay: String, CaseIterable, Identifiable, Sendable {
         case groups = "Groups", exaggerated = "Exaggerated", photo = "Photo"
         var id: String { rawValue }
     }
 
-    private struct Input: Equatable {
+    nonisolated private struct Input: Equatable, Sendable {
         var photo: UUID?
         var white: XYZ?
     }

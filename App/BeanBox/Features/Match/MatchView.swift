@@ -7,7 +7,7 @@ struct MatchView: View {
     @State private var open: FlavorRef?
     @State private var isShowingHow = false
 
-    struct FlavorRef: Identifiable {
+    nonisolated struct FlavorRef: Identifiable, Sendable {
         let id: String
     }
 
