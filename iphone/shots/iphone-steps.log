@@ -1,0 +1,45 @@
+----- tail -----
+05:38:07 iphone: booted
+05:38:23 iphone: installed
+05:38:28 iphone: launch papers-empty: com.pbordjadze.beanbox: 7070 
+05:38:29 iphone: papers-empty ready after 1 s
+05:38:35 iphone: captured papers-empty
+05:38:45 iphone: launch papers: com.pbordjadze.beanbox: 7654 
+05:38:52 iphone: papers ready after 7 s
+05:38:56 iphone: captured papers
+05:38:58 iphone: launch papers-swatches: com.pbordjadze.beanbox: 8312 
+05:39:15 iphone: papers-swatches ready after 17 s
+05:39:19 iphone: captured papers-swatches
+05:39:20 iphone: launch papers-cloth: com.pbordjadze.beanbox: 9699 
+05:39:23 iphone: papers-cloth ready after 3 s
+05:39:26 iphone: captured papers-cloth
+05:39:27 iphone: launch beans: com.pbordjadze.beanbox: 9758 
+05:39:32 iphone: beans ready after 5 s
+05:39:35 iphone: captured beans
+05:39:36 iphone: launch match: com.pbordjadze.beanbox: 10817 
+05:39:38 iphone: match ready after 2 s
+05:39:41 iphone: captured match
+05:39:42 iphone: launch match-open: com.pbordjadze.beanbox: 10888 
+05:39:44 iphone: match-open ready after 2 s
+05:39:49 iphone: captured match-open
+05:39:51 iphone: launch match-locked: com.pbordjadze.beanbox: 11413 
+05:39:53 iphone: match-locked ready after 2 s
+05:39:56 iphone: captured match-locked
+05:39:57 iphone: launch sort-empty: com.pbordjadze.beanbox: 11598 
+05:39:57 iphone: sort-empty ready after 0 s
+05:40:03 iphone: captured sort-empty
+05:40:06 iphone: launch sort: com.pbordjadze.beanbox: 11718 
+05:40:08 iphone: sort ready after 2 s
+05:40:11 iphone: captured sort
+05:40:12 iphone: launch sort-exaggerated: com.pbordjadze.beanbox: 12209 
+05:40:14 iphone: sort-exaggerated ready after 2 s
+05:40:17 iphone: captured sort-exaggerated
+05:40:18 iphone: launch sort-chart: com.pbordjadze.beanbox: 12350 
+05:40:20 iphone: sort-chart ready after 2 s
+05:40:23 iphone: captured sort-chart
+05:40:24 iphone: launch sort-dark: com.pbordjadze.beanbox: 12438 
+05:40:27 iphone: sort-dark ready after 3 s
+05:40:29 iphone: captured sort-dark
+05:40:31 iphone: launch sort-cloth: com.pbordjadze.beanbox: 13068 
+05:40:33 iphone: sort-cloth ready after 2 s
+05:40:36 iphone: captured sort-cloth

@@ -1,0 +1,3 @@
+----- tail -----
+build/release/Build/Products/Release-iphonesimulator/BeanBox.app/PrivacyInfo.xcprivacy: OK
+Release build ok: privacy manifest present, no demo code
