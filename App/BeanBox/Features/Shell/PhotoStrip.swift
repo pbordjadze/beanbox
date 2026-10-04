@@ -46,7 +46,8 @@ struct PhotoStrip: View {
             }
         }
         .confirmationDialog(
-            "Delete this photo?", isPresented: .constant(deleting != nil), titleVisibility: .visible, presenting: deleting
+            "Delete this photo?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+            titleVisibility: .visible, presenting: deleting
         ) { photo in
             Button("Delete Photo", role: .destructive) {
                 project.deletePhoto(photo.id)

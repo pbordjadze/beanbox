@@ -92,12 +92,18 @@ It is the native successor of the `beanbox` service in the homelab repo (FastAPI
 2. Run `CI_BRANCH=<branch> ci/fetch.sh <sha> <outdir>` in the background; it waits for the
    report CI publishes to `ci-shots/<branch>`: `STATUS.md` (job results), trimmed `*.log`,
    `core/core-test.log`, `iphone/errors.txt` (compiler errors and Release-check failures),
-   `iphone/shots/*.png` plus `*-app.log` and `*-steps.log`, and `ipa/errors.txt`.
+   `iphone/shots/*.png` plus `*-app.log` and `*-steps.log`; on `main`, `ipa/errors.txt` and
+   `ipa/source.json` instead.
+   Each push takes exactly one macOS job, because the account runs only five at a time across
+   all its repositories: a run here queues behind paint-by-number's (50–75 min each) when
+   that repo is busy. `ci/fetch.sh` gives up after an hour; the unauthenticated API shows
+   where a run is: `curl -s https://api.github.com/repos/pbordjadze/beanbox/actions/runs?per_page=3`.
 3. Read errors and screenshots, fix, repeat. Batch fixes; one validated push beats many guesses.
-4. Device builds: every branch archives an unsigned Release IPA (so device-only failures show
-   early); pushes to `main` also publish it as the `build-<run>` prerelease (the five newest
-   are kept) and rewrite the SideStore source on the `sidestore` branch
-   (`ci/sidestore_source.py`). Work on `dev`; merge to `main` to ship.
+4. Shipping: branches build for the simulator and take screenshots; `main` archives an
+   unsigned Release IPA, publishes it as the `build-<run>` prerelease (the five newest are
+   kept) and rewrites the SideStore source on the `sidestore` branch
+   (`ci/sidestore_source.py`). Work on `dev`; merge to `main` to ship. A device-only build
+   failure therefore shows on `main`, where it just means no new build is published.
 
 ## Conventions
 

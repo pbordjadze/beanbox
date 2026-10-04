@@ -21,7 +21,10 @@ struct AppShellView: View {
                 SortView()
             }
         }
-        .alert("Something went wrong", isPresented: .constant(project.problem != nil), presenting: project.problem) { _ in
+        .alert(
+            "Something went wrong", isPresented: Binding(get: { project.problem != nil }, set: { if !$0 { project.problem = nil } }),
+            presenting: project.problem
+        ) { _ in
             Button("OK") { project.problem = nil }
         } message: { problem in
             Text(problem)

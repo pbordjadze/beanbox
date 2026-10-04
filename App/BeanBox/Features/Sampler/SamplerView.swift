@@ -71,6 +71,10 @@ struct SamplerView: View {
                 // it is measured against the real paper.
                 isSettingWhite = photo.whiteAt == nil && !project.data.samples.contains { $0.photoID == photo.id }
             }
+            .onChange(of: photo?.whiteAt) { _, white in
+                // However the white got set, the prompt for it has been answered.
+                if white != nil { isSettingWhite = false }
+            }
             .sensoryFeedback(.impact(weight: .light), trigger: project.data.samples.count)
         }
     }
