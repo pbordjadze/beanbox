@@ -1,0 +1,190 @@
+name: CI
+
+# Every run publishes a report (STATUS.md, trimmed logs, compiler errors, screenshots) to the
+# branch `ci-shots/<branch>`, readable with plain git (see ci/fetch.sh).
+# Linux tests the portable core; macOS builds the app for the simulator, screenshots every demo
+# scenario on an iPhone, then builds Release and checks what ships. Every branch also archives
+# an unsigned device IPA, so a device-only build failure shows before it reaches `main`;
+# only `main` publishes it, as a `build-<n>` prerelease and a SideStore source listing the
+# latest builds (branch `sidestore`).
+
+on:
+  push:
+    branches-ignore: ['ci-shots/**', 'sidestore']
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: 'Demo scenarios to screenshot (space separated, optional @timeout-seconds)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  PROJECT: App/BeanBox.xcodeproj
+  SCHEME: BeanBox
+
+jobs:
+  core:
+    name: BeanCore tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p out
+          swift test 2>&1 | grep -vE '^\[[0-9]+/[0-9]+\]' | tee out/core-test.log | tail -60
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with: { name: core, path: out, if-no-files-found: ignore }
+
+  iphone:
+    name: iPhone — Debug build, screenshots, Release check
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start simulator
+        id: sim
+        run: |
+          # The first boot on a fresh runner takes minutes; it overlaps the build.
+          read -r KIND UDID MODEL RUNTIME < <(ci/simulators.sh iphone)
+          echo "$MODEL $RUNTIME $UDID"
+          mkdir -p out
+          nohup xcrun simctl boot "$UDID" > out/boot.log 2>&1 &
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Build
+        id: build
+        run: |
+          set -o pipefail
+          xcodebuild build -project "$PROJECT" -scheme "$SCHEME" -configuration Debug \
+            -IDEBuildingContinueBuildingAfterErrors=YES \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build/dd -quiet \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee out/app-build.log | tail -120
+      - name: Wait for simulator
+        run: |
+          xcrun simctl bootstatus "${{ steps.sim.outputs.udid }}" -b > /dev/null
+      - name: Screenshots
+        env:
+          SCENARIOS: ${{ github.event.inputs.scenarios }}
+        run: |
+          APP=build/dd/Build/Products/Debug-iphonesimulator/BeanBox.app
+          [ -d "$APP" ] || exit 0
+          ci/screenshots.sh "$APP" out/shots iphone "${{ steps.sim.outputs.udid }}" ${SCENARIOS:-$(cat ci/scenarios.txt)}
+      - name: Release build
+        # Not `always()`: that runs on cancelled runs too (holding a runner for a superseded
+        # commit) and would repeat the compiler errors of a failed Debug build.
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          # Debug-only code is compiled out of Release (`#if DEBUG`): build it, and check the
+          # shipped app has the privacy manifest and none of the demo code.
+          set -o pipefail
+          xcodebuild build -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build/release -quiet \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee out/release-build.log | tail -60
+          ci/check_release.sh build/release/Build/Products/Release-iphonesimulator/BeanBox.app 2>&1 | tee out/release-check.log
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p out/crashes
+          cp ~/Library/Logs/DiagnosticReports/BeanBox* out/crashes/ 2>/dev/null || true
+          grep -hE "error:|FAIL:" out/app-build.log out/release-build.log out/release-check.log 2>/dev/null | sort -u > out/errors.txt || true
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with: { name: iphone, path: out, if-no-files-found: ignore }
+
+  ipa:
+    name: IPA for SideStore (unsigned device build)
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      BUILD: ${{ github.run_number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Archive
+        run: |
+          set -o pipefail
+          mkdir -p out
+          # Version 1.0.<run>, build <run>: every build is an update to the installed one.
+          xcodebuild archive -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/BeanBox.xcarchive -quiet \
+            MARKETING_VERSION="1.0.$BUILD" CURRENT_PROJECT_VERSION="$BUILD" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee out/ipa-build.log | tail -80
+      - name: Package
+        run: |
+          # SideStore signs the app with the user's Apple ID when installing it.
+          APP=build/BeanBox.xcarchive/Products/Applications/BeanBox.app
+          mkdir -p build/ipa/Payload
+          cp -R "$APP" build/ipa/Payload/
+          (cd build/ipa && zip -qry ../../out/BeanBox.ipa Payload)
+          ls -l out/BeanBox.ipa
+          /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" -c "Print CFBundleVersion" "$APP/Info.plist"
+      - name: Publish release and SideStore source
+        if: github.ref_name == 'main'
+        run: |
+          git log -1 --format=%s > out/notes.txt
+          gh release create "build-$BUILD" out/BeanBox.ipa --prerelease --target "$GITHUB_SHA" \
+            --title "Build $BUILD" --notes-file out/notes.txt
+          # Keep the five newest builds.
+          gh release list --limit 100 --json tagName -q '.[].tagName' | grep '^build-' | tail -n +6 |
+            while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
+          SOURCE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/sidestore"
+          mkdir -p build/source
+          python3 ci/sidestore_source.py build/BeanBox.xcarchive/Products/Applications/BeanBox.app \
+            "$SOURCE/icon.png" > build/source/source.json
+          cp App/BeanBox/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png build/source/icon.png
+          printf '# SideStore source\n\nAdd %s/source.json in SideStore (Sources → +).\n' "$SOURCE" > build/source/README.md
+          cp build/source/source.json out/
+          cd build/source
+          git init -q && git checkout -q -b sidestore && git add -A
+          git -c user.name="ci" -c user.email="ci@users.noreply.github.com" commit -qm "SideStore source for build $BUILD"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "sidestore:refs/heads/sidestore"
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          grep -hE "error:" out/ipa-build.log 2>/dev/null | sort -u > out/errors.txt || true
+          # The report branch is for reading, not for downloading builds.
+          rm -f out/BeanBox.ipa
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with: { name: ipa, path: out, if-no-files-found: ignore }
+
+  report:
+    name: Publish report
+    needs: [core, iphone, ipa]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with: { path: report }
+      - name: Write status and push to ci-shots/${{ github.ref_name }}
+        run: |
+          mkdir -p report && cd report
+          for f in $(find . -name '*.log'); do
+            # Keep every diagnostic line plus the tail; full logs can be huge.
+            { grep -nE "error:|warning:|failed|FAIL|✘|Fatal|crash" "$f" | head -400; echo "----- tail -----"; tail -200 "$f"; } > "$f.trimmed"
+            mv "$f.trimmed" "$f"
+          done
+          {
+            echo "commit: ${GITHUB_SHA}"
+            echo "run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "core: ${{ needs.core.result }}"
+            echo "iphone: ${{ needs.iphone.result }}"
+            echo "ipa: ${{ needs.ipa.result }}"
+          } > STATUS.md
+          echo "${GITHUB_SHA}" > COMMIT
+          git init -q && git checkout -q -b shots
+          git add -A
+          git -c user.name="ci" -c user.email="ci@users.noreply.github.com" commit -qm "CI report for ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" "shots:refs/heads/ci-shots/${GITHUB_REF_NAME}"
