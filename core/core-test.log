@@ -1,0 +1,140 @@
+----- tail -----
+Building for debugging...
+Build complete! (20.30s)
+Test Suite 'All tests' started at 2026-10-04 05:43:45.283
+Test Suite 'debug.xctest' started at 2026-10-04 05:43:45.284
+Test Suite 'debug.xctest' passed at 2026-10-04 05:43:45.284
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+Test Suite 'All tests' passed at 2026-10-04 05:43:45.284
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+◇ Test run started.
+↳ Testing Library Version: 6.2.4 (5ee435b15ad40ec)
+↳ Target Platform: x86_64-unknown-linux-gnu
+◇ Suite SortingTests started.
+◇ Suite ClusteringTests started.
+◇ Suite SamplingTests started.
+◇ Suite RasterTests started.
+◇ Suite MatchingTests started.
+◇ Suite ColorScienceTests started.
+◇ Test noSheetIsAClearError() started.
+◇ Test beansOnAClothWithNoWhiteAnywhereAreStillSorted() started.
+◇ Test otherColourFamiliesAreSeparatedOnWhitePaper(family:) started.
+◇ Test tappedWhiteCalibratesADarkSheetShot() started.
+◇ Test touchingBeansAreSplit() started.
+◇ Test tableAroundTheSheetIsIgnored() started.
+◇ Test aBorrowedWhiteIsRaisedWhenThePhotoOutshinesIt() started.
+◇ Test darkSheetWithWhiteShowingMeasuresTheSameAsWhitePaper() started.
+◇ Test tappedWhiteOnAColouredPatchShiftsEverything() started.
+◇ Test wardSeparatesObviousClustersAtEveryCut() started.
+◇ Test eigenOfAKnownMatrix() started.
+◇ Test oneFlavourIsNotSplit() started.
+◇ Test aPhotoWithNothingWhiteKeepsTheCamerasBalance() started.
+◇ Test findsEveryBeanDespiteShadowsAndUnevenLight() started.
+◇ Test componentsAreLabelledInRasterOrderWithTheirBoxes() started.
+◇ Test nearestSiteIsExact() started.
+◇ Test dilateGrowsByHalfTheSquare() started.
+◇ Test overexposedWhiteIsFlagged() started.
+◇ Test exaggeratedColoursAndPlotCoordinatesAreFilledIn() started.
+◇ Test darkSheetWithNoWhiteInShotStillGroupsButIsFlagged() started.
+◇ Test aWhiteBorrowedFromThePreviousPhotoCarriesItsCalibration() started.
+◇ Test linearSolve() started.
+◇ Test paleBeansAreSeparatedOnADarkSheet(sheet:) started.
+◇ Test foldsAndSheenOnAClothAreNotBeans() started.
+◇ Test aWhiteFromAnotherPhotoCalibratesAClothShot() started.
+◇ Test tapOutsideThePhotoMeasuresNothing() started.
+◇ Test frameHuggingNeedsBothTheEdgeAndLength() started.
+◇ Test aTapThatSpillsOntoThePaperStillReadsTheObject() started.
+◇ Test bodyColorIgnoresGlintsAndShadow() started.
+◇ Test aGrainySurfaceStillWorks() started.
+◇ Test threeSimilarRedsAreSeparated() started.
+◇ Test sameColoursMeasureAlikeUnderDifferentLight() started.
+◇ Test sameInputGivesTheSameAnswer() started.
+◇ Test autoWhitePrefersNeutralPaperOverBrightYellow() started.
+◇ Test openRemovesSpecksAndKeepsBlobs() started.
+◇ Test flatFieldMakesColourIndependentOfPosition() started.
+◇ Test lockIsHonouredAndTheRestResolvesAroundIt() started.
+◇ Test flavorKeyIgnoresCaseAndSpacing() started.
+◇ Test kLHalvesAPureLightnessDifference() started.
+◇ Test percentileInterpolatesLikeNumpy() started.
+◇ Test eachFlavorGetsItsClosestSheet() started.
+◇ Test pixelsMeasureTheSameAsTheOriginalImplementation() started.
+◇ Test alternatesAreRankedAndShowWhoHoldsThem() started.
+◇ Test displayP3ComponentsStayInRangeForASaturatedBean() started.
+◇ Test unavailableSheetIsSkippedUnlessLocked() started.
+◇ Test whiteBalanceNeutralisesAColourCast() started.
+◇ Test matrixInverse() started.
+◇ Test assignmentIsOptimalOnSmallMatricesOfEveryShape() started.
+◇ Test case passing 1 argument family → "yellows" to otherColourFamiliesAreSeparatedOnWhitePaper(family:) started.
+◇ Test labRoundTripsThroughXYZ() started.
+◇ Test contestedSheetGoesWhereTheTotalIsBest() started.
+◇ Test case passing 1 argument family → "greens" to otherColourFamiliesAreSeparatedOnWhitePaper(family:) started.
+◇ Test ciede2000MatchesTheReferencePairs() started.
+◇ Test noPapersYet() started.
+◇ Test case passing 1 argument family → "darks" to otherColourFamiliesAreSeparatedOnWhitePaper(family:) started.
+◇ Test hexOfKnownColours() started.
+◇ Test moreFlavorsThanSheetsLeavesTheWorstFitEmpty() started.
+◇ Test displayP3RedIsMoreSaturatedThanSRGBRed() started.
+◇ Test case passing 1 argument sheet → "black" to paleBeansAreSeparatedOnADarkSheet(sheet:) started.
+◇ Test case passing 1 argument sheet → "navy" to paleBeansAreSeparatedOnADarkSheet(sheet:) started.
+✔ Test noSheetIsAClearError() passed after 4.240 seconds.
+✔ Test beansOnAClothWithNoWhiteAnywhereAreStillSorted() passed after 4.241 seconds.
+✔ Test otherColourFamiliesAreSeparatedOnWhitePaper(family:) with 3 test cases passed after 4.241 seconds.
+✔ Test aBorrowedWhiteIsRaisedWhenThePhotoOutshinesIt() passed after 4.241 seconds.
+✔ Test tappedWhiteCalibratesADarkSheetShot() passed after 4.241 seconds.
+✔ Test tappedWhiteOnAColouredPatchShiftsEverything() passed after 4.241 seconds.
+✔ Test wardSeparatesObviousClustersAtEveryCut() passed after 4.241 seconds.
+✔ Test touchingBeansAreSplit() passed after 4.241 seconds.
+✔ Test eigenOfAKnownMatrix() passed after 4.241 seconds.
+✔ Test aPhotoWithNothingWhiteKeepsTheCamerasBalance() passed after 4.241 seconds.
+✔ Test tableAroundTheSheetIsIgnored() passed after 4.241 seconds.
+✔ Test componentsAreLabelledInRasterOrderWithTheirBoxes() passed after 4.241 seconds.
+✔ Test nearestSiteIsExact() passed after 4.241 seconds.
+✔ Test dilateGrowsByHalfTheSquare() passed after 4.241 seconds.
+✔ Test overexposedWhiteIsFlagged() passed after 4.241 seconds.
+✔ Test oneFlavourIsNotSplit() passed after 4.241 seconds.
+✔ Test findsEveryBeanDespiteShadowsAndUnevenLight() passed after 4.241 seconds.
+✔ Test aWhiteBorrowedFromThePreviousPhotoCarriesItsCalibration() passed after 4.241 seconds.
+✔ Test linearSolve() passed after 4.241 seconds.
+✔ Test exaggeratedColoursAndPlotCoordinatesAreFilledIn() passed after 4.241 seconds.
+✔ Test darkSheetWithWhiteShowingMeasuresTheSameAsWhitePaper() passed after 4.242 seconds.
+✔ Test darkSheetWithNoWhiteInShotStillGroupsButIsFlagged() passed after 4.241 seconds.
+✔ Test paleBeansAreSeparatedOnADarkSheet(sheet:) with 2 test cases passed after 4.241 seconds.
+✔ Test frameHuggingNeedsBothTheEdgeAndLength() passed after 4.241 seconds.
+✔ Test tapOutsideThePhotoMeasuresNothing() passed after 4.241 seconds.
+✔ Test aTapThatSpillsOntoThePaperStillReadsTheObject() passed after 4.241 seconds.
+✔ Test bodyColorIgnoresGlintsAndShadow() passed after 4.241 seconds.
+✔ Test foldsAndSheenOnAClothAreNotBeans() passed after 4.242 seconds.
+✔ Test sameColoursMeasureAlikeUnderDifferentLight() passed after 4.241 seconds.
+✔ Test autoWhitePrefersNeutralPaperOverBrightYellow() passed after 4.241 seconds.
+✔ Test aGrainySurfaceStillWorks() passed after 4.241 seconds.
+✔ Test openRemovesSpecksAndKeepsBlobs() passed after 4.242 seconds.
+✔ Test threeSimilarRedsAreSeparated() passed after 4.242 seconds.
+✔ Test lockIsHonouredAndTheRestResolvesAroundIt() passed after 4.242 seconds.
+✔ Test flavorKeyIgnoresCaseAndSpacing() passed after 4.242 seconds.
+✔ Test kLHalvesAPureLightnessDifference() passed after 4.242 seconds.
+✔ Test percentileInterpolatesLikeNumpy() passed after 4.242 seconds.
+✔ Test eachFlavorGetsItsClosestSheet() passed after 4.242 seconds.
+✔ Test pixelsMeasureTheSameAsTheOriginalImplementation() passed after 4.242 seconds.
+✔ Test alternatesAreRankedAndShowWhoHoldsThem() passed after 4.242 seconds.
+✔ Test displayP3ComponentsStayInRangeForASaturatedBean() passed after 4.241 seconds.
+✔ Test unavailableSheetIsSkippedUnlessLocked() passed after 4.242 seconds.
+✔ Test whiteBalanceNeutralisesAColourCast() passed after 4.241 seconds.
+✔ Test matrixInverse() passed after 4.241 seconds.
+✔ Test assignmentIsOptimalOnSmallMatricesOfEveryShape() passed after 4.241 seconds.
+✔ Test labRoundTripsThroughXYZ() passed after 4.059 seconds.
+✔ Test contestedSheetGoesWhereTheTotalIsBest() passed after 4.059 seconds.
+✔ Test ciede2000MatchesTheReferencePairs() passed after 3.460 seconds.
+✔ Test noPapersYet() passed after 3.460 seconds.
+✔ Test hexOfKnownColours() passed after 3.427 seconds.
+✔ Test moreFlavorsThanSheetsLeavesTheWorstFitEmpty() passed after 3.427 seconds.
+✔ Test displayP3RedIsMoreSaturatedThanSRGBRed() passed after 3.427 seconds.
+✔ Suite SamplingTests passed after 4.244 seconds.
+✔ Suite ClusteringTests passed after 4.244 seconds.
+✔ Suite RasterTests passed after 4.244 seconds.
+✔ Suite MatchingTests passed after 4.243 seconds.
+✔ Suite ColorScienceTests passed after 4.243 seconds.
+✔ Test aWhiteFromAnotherPhotoCalibratesAClothShot() passed after 4.726 seconds.
+✔ Test flatFieldMakesColourIndependentOfPosition() passed after 4.796 seconds.
+✔ Test sameInputGivesTheSameAnswer() passed after 4.891 seconds.
+✔ Suite SortingTests passed after 4.892 seconds.
+✔ Test run with 55 tests in 6 suites passed after 4.892 seconds.
