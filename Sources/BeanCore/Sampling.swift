@@ -16,7 +16,21 @@ public enum Sampling {
         public var xyz: XYZ
         /// The reference was overexposed; colours measured against it read too pale.
         public var clipped: Bool
+        /// False when nothing in the photo could pass for white. `xyz` is then the camera's own
+        /// idea of white (`cameraWhite`), and colours are only as good as its balance.
+        public var found: Bool
+
+        public init(xyz: XYZ, clipped: Bool, found: Bool = true) {
+            self.xyz = xyz
+            self.clipped = clipped
+            self.found = found
+        }
     }
+
+    /// Where a camera puts white paper in a normally exposed photo, in linear light (the
+    /// one real iPhone shot measured had it at 0.79). The camera's white is never taken to be
+    /// dimmer than this, or the brightest thing in a scene of dark beans would read as white.
+    static let cameraWhiteFloor = 0.75
 
     /// Chroma with brightness divided out: how far from neutral a colour's hue is, regardless
     /// of how light it is.
@@ -43,6 +57,10 @@ public enum Sampling {
     /// isn't taken for white. "Brightest" runs from the 98th percentile (skipping specular
     /// glints) down to 20 % below it, rather than being a fixed share of the pixels, so a strip
     /// of white paper beside a large dark sheet is still found.
+    ///
+    /// A photo doesn't have to contain anything white. The neutral surface must be among the
+    /// brightest things in the frame (a grey table under bright paper is not white), and
+    /// cover enough of it; otherwise the result is the camera's own white, marked not `found`.
     public static func autoWhite(_ image: PixelImage) -> White {
         let m = ColorScience.toXYZ(image.space)
         let t = ColorScience.decodeTable
@@ -59,13 +77,37 @@ public enum Sampling {
                 neutral.append(neutralChroma(of: xyz) < neutralChromaLimit)
             }
         }
-        if Double(neutral.count(where: { $0 })) < 0.03 * Double(neutral.count) {
-            neutral = [Bool](repeating: true, count: neutral.count)
+        let brightest = Stats.percentile(luminance.sorted(), 98)
+        let candidates = luminance.indices.filter { neutral[$0] && luminance[$0] >= 0.5 * brightest }
+        guard Double(candidates.count) >= 0.03 * Double(luminance.count) else {
+            return White(xyz: cameraWhite(brightest: brightest), clipped: false, found: false)
         }
-        let pool = luminance.indices.filter { neutral[$0] }.map { luminance[$0] }.sorted()
-        let top = Stats.percentile(pool, 98)
-        let band = pixels.indices.filter { neutral[$0] && luminance[$0] >= 0.8 * top && luminance[$0] <= top }
+        let top = Stats.percentile(candidates.map { luminance[$0] }.sorted(), 98)
+        let band = candidates.filter { luminance[$0] >= 0.8 * top && luminance[$0] <= top }
         return white(from: band.map { pixels[$0] }, space: image.space)
+    }
+
+    /// White as the camera rendered the scene: its own colour balance, at the level of the
+    /// brightest thing in the frame (`brightest`, linear luminance) or of a normally exposed
+    /// white if the scene is dimmer than that.
+    static func cameraWhite(brightest: Double) -> XYZ {
+        ColorScience.d65 * min(max(brightest, cameraWhiteFloor), 1)
+    }
+
+    /// For a photo with no white of its own: the white of another photo taken just before
+    /// under the same light, raised if this photo has something brighter than it.
+    public static func borrowedWhite(for image: PixelImage, from reference: XYZ) -> XYZ {
+        let m = ColorScience.toXYZ(image.space)
+        let t = ColorScience.decodeTable
+        var luminance: [Double] = []
+        for y in stride(from: 0, to: image.height, by: 4) {
+            for x in stride(from: 0, to: image.width, by: 4) {
+                let i = (y * image.width + x) * 4
+                luminance.append((m * SIMD3(t[Int(image.rgba[i])], t[Int(image.rgba[i + 1])], t[Int(image.rgba[i + 2])])).y)
+            }
+        }
+        let brightest = min(Stats.percentile(luminance.sorted(), 98), 1)
+        return reference * (max(reference.y, brightest) / reference.y)
     }
 
     /// Pixels within `r` of `(x, y)` and their distances from that centre.

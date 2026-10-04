@@ -67,9 +67,10 @@ struct SamplerView: View {
                 loaded = nil
                 guard let photo else { return }
                 loaded = await project.loaded(photo)
-                // A fresh photo starts by asking for its white: one tap, and every colour in
-                // it is measured against the real paper.
-                isSettingWhite = photo.whiteAt == nil && !project.data.samples.contains { $0.photoID == photo.id }
+                // A fresh photo that has something white in it starts by asking for a tap on
+                // it: one tap, and every colour is measured against the real thing rather than
+                // a guess. A photo with nothing white has nothing to ask for.
+                isSettingWhite = photo.basis == .found && !project.data.samples.contains { $0.photoID == photo.id }
             }
             .onChange(of: photo?.whiteAt) { _, white in
                 // However the white got set, the prompt for it has been answered.
@@ -85,10 +86,10 @@ struct SamplerView: View {
     private func canvas(_ photo: PhotoRecord, _ loaded: LoadedPhoto) -> some View {
         if isSettingWhite {
             HStack(alignment: .firstTextBaseline) {
-                Text("**First, tap the white paper** in this photo so colours are measured against it.")
+                Text("**Tap something white** in this photo if there is any — paper is best — so colours are measured against it.")
                     .font(.subheadline)
                 Spacer(minLength: 8)
-                Button(photo.whiteAt == nil ? "Skip" : "Cancel") { isSettingWhite = false }
+                Button(photo.whiteAt == nil ? "None" : "Cancel") { isSettingWhite = false }
                     .font(.subheadline)
             }
             .padding(10)
@@ -120,7 +121,7 @@ struct SamplerView: View {
             .frame(maxWidth: 130)
             Spacer()
             Menu("White", systemImage: "circle.lefthalf.filled") {
-                Button("Tap the White Paper", systemImage: "hand.tap") { isSettingWhite = true }
+                Button("Tap Something White", systemImage: "hand.tap") { isSettingWhite = true }
                 if photo.whiteAt != nil {
                     Button("Guess Automatically", systemImage: "wand.and.stars") {
                         project.setWhite(of: photo.id, pixels: loaded.pixels, at: nil, radius: 0)
@@ -129,11 +130,23 @@ struct SamplerView: View {
             }
             .font(.subheadline)
         }
-        Text(photo.whiteAt == nil
-            ? "White point: automatic guess. If the swatches look tinted, set it by tapping the white paper."
-            : "White point: where you tapped (the square on the photo).")
+        Text(whiteNote(photo.basis))
             .font(.footnote)
             .foregroundStyle(.secondary)
+    }
+
+    /// What this photo's colours are measured against, and what to do if that looks wrong.
+    private func whiteNote(_ basis: WhiteBasis) -> String {
+        switch basis {
+        case .tapped:
+            "White: where you tapped (the square on the photo)."
+        case .found:
+            "White: the brightest neutral area, found automatically. If the swatches look tinted, tap something white."
+        case .borrowed:
+            "Nothing white in this photo, so it uses the white from your previous one. That holds while the light hasn’t changed."
+        case .camera:
+            "Nothing white in this photo, so colours are as the camera saw them — a little warm under indoor light. They still compare well with other photos taken the same way."
+        }
     }
 
     private var nameField: some View {
@@ -324,13 +337,14 @@ struct Tips: View {
         switch kind {
         case .paper:
             [
-                "Fan a few sheets out on white printer paper so a strip of each shows. No flash, and keep your own shadow off them.",
-                "Add the photo, tap the white paper once, then tap each sheet. Every tap becomes the next number — pencil that number on the sheet’s corner so you can find it again.",
+                "Fan a few sheets out so a strip of each shows. No flash, and keep your own shadow off them.",
+                "Something white in the shot — printer paper under the sheets is ideal — makes the colours more accurate: tap it once when asked. Without any, the app carries on with the white from your previous photo, or the camera’s own.",
+                "Then tap each sheet. Every tap becomes the next number — pencil that number on the sheet’s corner so you can find it again.",
                 "Shoot the beans in the same spot under the same light. Daylight by a window beats a warm lamp.",
             ]
         case .bean:
             [
-                "Put a bean or two of each flavour on white printer paper, in the same spot and light you used for the paper.",
+                "Photograph the beans in the same spot and light you used for the paper — on white paper if you can, though any surface works.",
                 "Type the flavour, then tap the bean. Leave the name blank to save it as “Bean 1” and name it later.",
                 "Tapping the same flavour again averages the readings. Flavours you can’t tell apart by eye? Split them in the Sort tab first.",
             ]

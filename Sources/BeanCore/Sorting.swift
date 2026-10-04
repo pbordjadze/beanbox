@@ -6,9 +6,11 @@ import Foundation
 /// segment every bean → measure each bean's body colour → cluster at every group count, so
 /// the interface can slide between groupings without recomputing.
 ///
-/// The sheet is normally white paper. White and pale beans don't show up against that, so a
-/// dark sheet works too — ideally with some of the white paper underneath still visible at
-/// the frame's edge to calibrate against.
+/// The sheet is whatever plain surface fills most of the frame; it only has to contrast with
+/// the beans. White paper is the best one, because it is also the white the colours are
+/// measured against. On anything else the white comes from a tap, from white showing around
+/// the sheet, from a previous photo, or failing all of those from the camera's own balance:
+/// the grouping is as good either way, the absolute colours less so.
 public enum Sorting {
     /// One per colour in the app's validated group palette.
     public static let maxGroups = 6
@@ -32,6 +34,10 @@ public enum Sorting {
     /// Higher splits beans that touch along more of their length, but starts cutting single
     /// kidney-shaped beans in two at the waist.
     static let coreDepth = 0.8
+    /// A blob longer than this many times its width, or filling less than this much of its
+    /// own best-fit ellipse, is not a bean: a fold in a cloth, wood grain, a crumb trail.
+    static let maxAspect = 3.2
+    static let minFill = 0.72
 
     public enum Failure: Error, Equatable {
         /// No plain sheet filling the frame, or fewer than two beans on it.
@@ -56,8 +62,9 @@ public enum Sorting {
     public struct Sheet: Sendable, Equatable {
         public var lab: Lab
         public var isWhite: Bool
-        /// False when the shot had no white to measure against: colours are then consistent
-        /// within the photo (fine for grouping) but not comparable with other photos.
+        /// False when the shot had no white of its own to measure against (white paper under or
+        /// around the beans, or a tap). Colours are then consistent within the photo, which is
+        /// all grouping needs, but only roughly comparable with other photos.
         public var calibrated: Bool
     }
 
@@ -81,8 +88,12 @@ public enum Sorting {
         public var suggestedGroupCount: Int
     }
 
-    public static func analyze(_ image: PixelImage, tappedWhite: XYZ? = nil) throws -> Analysis {
-        let found = try segment(image, tappedWhite: tappedWhite)
+    /// `tappedWhite` is the photo's white if the user set one. `fallbackWhite` is a white to
+    /// use when the shot turns out to have none of its own (say, one borrowed from the photo
+    /// taken before it); without it the camera's balance stands in. Neither matters when the
+    /// beans are lying on white paper.
+    public static func analyze(_ image: PixelImage, tappedWhite: XYZ? = nil, fallbackWhite: XYZ? = nil) throws -> Analysis {
+        let found = try segment(image, tappedWhite: tappedWhite, fallbackWhite: fallbackWhite)
         return group(found.beans, clumps: found.clumps, sheet: found.sheet)
     }
 
@@ -104,9 +115,8 @@ public enum Sorting {
         }
     }
 
-    /// Finds every bean on the sheet. `tappedWhite` is the photo's white if the user set one;
-    /// it only matters when the sheet isn't white paper.
-    static func segment(_ image: PixelImage, tappedWhite: XYZ?) throws -> (beans: [Measured], clumps: [Blob], sheet: Sheet) {
+    /// Finds every bean on the sheet.
+    static func segment(_ image: PixelImage, tappedWhite: XYZ?, fallbackWhite: XYZ? = nil) throws -> (beans: [Measured], clumps: [Blob], sheet: Sheet) {
         let w = image.width, h = image.height, n = w * h
         guard w >= 32, h >= 32 else { throw Failure.noBeans }
         // Work in Bradford cone space throughout, so dividing by the white here is the same
@@ -175,6 +185,7 @@ public enum Sorting {
 
         let reference = referenceWhite(
             width: w, height: h, notSheet: notSheet, level: level, tapped: tapped,
+            fallback: fallbackWhite.map { ColorScience.bradford * $0 },
             flat: flatAt, isSurround: { hugging[Int(roughParts.labels[$0])] })
         let scale = target / reference.white
         for i in 0..<n {
@@ -249,7 +260,7 @@ public enum Sorting {
             let label = Int(owner[i])
             if distance[i] >= 0.35 * deepest[label] { body[label].append(labAt(lab, i)) }
         }
-        var found: [(area: Double, shape: Blob, lab: Lab)] = []
+        var found: [(area: Double, shape: Blob, lab: Lab, fill: Double)] = []
         for label in 1..<count where area[label] > 0 && !body[label].isEmpty {
             let m = area[label]
             let cx = sx[label] / m, cy = sy[label] / m
@@ -260,13 +271,18 @@ public enum Sorting {
                 rx: (2 * (mu20 + mu02 + common)).squareRoot(),
                 ry: max(2 * (mu20 + mu02 - common), 1).squareRoot(),
                 angle: 0.5 * atan2(2 * mu11, mu20 - mu02) * 180 / .pi)
-            found.append((m, shape, Sampling.bodyColor(body[label])))
+            found.append((m, shape, Sampling.bodyColor(body[label]), m / (.pi * shape.rx * shape.ry)))
         }
-        guard !found.isEmpty else { throw Failure.noBeans }
-        let typicalArea = Stats.median(found.map(\.area))
-        let beans = found.filter { $0.area >= 0.3 * typicalArea && $0.area <= 1.9 * typicalArea }
+        // On a surface that isn't perfectly plain, not everything that stands out is a bean.
+        let beanlike = found.filter { $0.shape.rx <= maxAspect * $0.shape.ry && $0.fill >= minFill }
+        guard !beanlike.isEmpty else { throw Failure.noBeans }
+        let typicalArea = Stats.median(beanlike.map(\.area))
+        let beans = beanlike.filter { $0.area >= 0.3 * typicalArea && $0.area <= 1.9 * typicalArea }
             .map { Measured(shape: $0.shape, lab: $0.lab) }
-        let clumps = found.filter { $0.area > 1.9 * typicalArea }.map(\.shape)
+        // A clump is a few beans run together: bigger than one, but still compact.
+        let clumps = found
+            .filter { $0.area > 1.9 * typicalArea && $0.area <= 8 * typicalArea && $0.fill >= 0.5 && $0.shape.rx <= 6 * $0.shape.ry }
+            .map(\.shape)
         guard beans.count >= 2 else { throw Failure.noBeans }
         return (beans, clumps, Sheet(lab: sheetLab, isWhite: reference.isWhite, calibrated: reference.calibrated))
     }
@@ -363,7 +379,7 @@ public enum Sorting {
     /// Picks the white for a flattened shot, in cone space.
     private static func referenceWhite(
         width w: Int, height h: Int, notSheet: [UInt8], level: SIMD3<Double>, tapped: SIMD3<Double>?,
-        flat: (Int) -> SIMD3<Double>, isSurround: (Int) -> Bool
+        fallback: SIMD3<Double>?, flat: (Int) -> SIMD3<Double>, isSurround: (Int) -> Bool
     ) -> (white: SIMD3<Double>, isWhite: Bool, calibrated: Bool) {
         let toXYZ = ColorScience.bradfordInverse
         var pixels: [SIMD3<Double>] = []
@@ -402,12 +418,22 @@ public enum Sorting {
             return (Stats.median(band.map { pixels[$0] }), false, true)
         }
 
-        // No white anywhere. Take the light's colour from the sheet if it is neutral (black or
-        // grey paper reflects the lamp), and call the brightest thing in the shot white so
-        // values stay in a sane range.
+        // No white in the shot. The level white would have is judged from the brightest
+        // sizeable thing in the frame (its 98th percentile, which skips specular glints).
+        let ranked = luminance.sorted(by: >)
+        let rank = Int(0.02 * Double(frame))
+        let brightest = min(rank < ranked.count ? max(ranked[rank], levelXYZ.y) : levelXYZ.y, 1)
+        // A white handed in from outside (the previous photo's) is the best stand-in; raised,
+        // if need be, so nothing sizeable here outshines it.
+        if let fallback {
+            let y = (toXYZ * fallback).y
+            return (fallback * (max(y, brightest) / y), false, false)
+        }
+        // Otherwise take the light's colour from the sheet if it is neutral (black or grey
+        // paper reflects the lamp) and from the camera's balance if not, at that level or a
+        // normally exposed white's, whichever is higher.
         let tint = sheetNeutral ? level : ColorScience.bradford * ColorScience.d65
-        let peak = luminance.isEmpty ? levelXYZ.y : Stats.percentile(luminance.sorted(), 99.5)
-        return (tint * (peak / (toXYZ * tint).y), false, false)
+        return (tint * (max(brightest, Sampling.cameraWhiteFloor) / (toXYZ * tint).y), false, false)
     }
 
     // MARK: Grouping

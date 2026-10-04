@@ -14,13 +14,19 @@ It is the native successor of the `beanbox` service in the homelab repo (FastAPI
   - `ColorScience.swift` camera RGB → white-balanced CIELAB (Bradford adaptation, sRGB and
     Display P3 primaries), CIEDE2000, Lab → display colour, `PixelImage`.
   - `Sampling.swift` the colour under a tap (`sample`), the white under a tap or guessed
-    (`autoWhite`), `bodyColor` (trimmed median that ignores glints and contact shadow).
+    (`autoWhite`, which says when the photo has none), a white carried over from another
+    photo (`borrowedWhite`), `bodyColor` (trimmed median that ignores glints and contact
+    shadow).
   - `Matching.swift` flavour → sheet assignment (`Matching.solve`, Hungarian in `Assignment`).
   - `Sorting.swift` the sorter (`Sorting.analyze`; pipeline in its doc comment), with
     `Raster.swift` (morphology, connected components, exact distance/nearest-site transform)
     and `Clustering.swift` (Ward, silhouette, 3×3 eigen).
+- `Sources/beans` — headless CLI over the core, for real photos (binary PPM in; `--p3` for
+  iPhone pixel values): `beans white`, `beans sample x,y,r …`, `beans sort`. Build it with
+  `tools/swift.sh build -c release --product beans` and run it in the same Docker image.
 - `Tests/BeanCoreTests` — Swift Testing. `Synth.swift` renders synthetic photos (look-alike
-  trios for five colour families, on white paper or a dark sheet, under warm uneven light).
+  trios for five colour families; on white paper, a dark sheet, a cloth with folds or a
+  grainy table; under warm uneven light).
 - `App/` — Xcode project (`BeanBox.xcodeproj`, synchronized folders: adding files needs no
   project edits) with the SwiftUI app.
 - `tools/` — `swift.sh`, `icon/make_icon.py`.
@@ -34,9 +40,16 @@ It is the native successor of the `beanbox` service in the homelab repo (FastAPI
 
 ## Invariants
 
-- **Every stored Lab value is relative to its photo's white paper**, pinned to
+- **Every stored Lab value is relative to its photo's white**, pinned to
   `ColorScience.whiteY` (L* ≈ 96). That is what makes photos comparable. Changing `whiteY`
   or the adaptation invalidates every saved measurement.
+- **Nothing has to be white.** A photo's white comes from, best first (`WhiteBasis`): a tap;
+  the brightest neutral surface found in it; the white of the last photo that had one, if
+  added within two hours (`Project.automaticWhite`: same sitting, same light); the camera's
+  own balance. The last two are stand-ins, and the interface says which one a photo is on.
+  On the one real photo measured (warm lamp), the camera's balance read every colour about
+  +7 L and +10 b off its white-referenced value: a common shift, so photos measured the same
+  way still compare well with each other, but mixing bases costs accuracy.
 - **Photos are Display P3.** `PhotoLoader` renders every photo into P3 and the core applies
   the P3 → XYZ matrix when measuring. Converting to sRGB first would clip the saturated reds
   the sorter has to tell apart.
@@ -45,7 +58,9 @@ It is the native successor of the `beanbox` service in the homelab repo (FastAPI
 - **Changing a photo's white re-measures its tapped samples** (`Project.setWhite`). Colours
   saved from a sorted group have no tap and are not re-measured.
 - **Saved data** is `Application Support/Project/project.json` (`ProjectData`) beside the
-  photos' original files. Add fields with defaults; never rename them.
+  photos' original files. Never rename a field, and add new ones as optionals: the
+  synthesized decoder has no defaults for missing keys, and a file it can't read is set
+  aside rather than overwritten (`Project.init`), which to the user is an empty app.
 - **The interface is neutral grey and light-only on purpose**: a coloured or dark surround
   shifts how a swatch looks.
 - **Group colours** (`Theme.groups`) are six hues from the dataviz reference palette validated
@@ -55,18 +70,23 @@ It is the native successor of the `beanbox` service in the homelab repo (FastAPI
 
 ## Sorter notes
 
-- The sheet is whatever colour fills most of the frame (`dominant`). Darker-than-sheet is
-  down-weighted (`shadowLWeight`) so cast shadows stay background; lighter-than-sheet counts
-  in full once the lighting is flattened, which is what makes pale beans visible on a dark
-  sheet.
+- The sheet is whatever colour fills most of the frame (`dominant`): any plain surface the
+  beans stand out from. Darker-than-sheet is down-weighted (`shadowLWeight`) so cast shadows
+  stay background; lighter-than-sheet counts in full once the lighting is flattened, which is
+  what makes pale beans visible on a dark surface.
+- Not everything that stands out from a real surface is a bean: blobs longer than
+  `maxAspect` times their width, or filling less than `minFill` of their own ellipse (folds
+  and sheen on a cloth, wood grain), are dropped.
 - Where the white comes from (`referenceWhite`), in order: the sheet itself if it is neutral
-  and nothing sizeable outshines it; the photo's tapped white; white paper showing around a
-  dark sheet (bright neutral pixels in components that hug the frame, so white beans never
-  qualify); otherwise the result is flagged `calibrated: false` and the app refuses to save
-  its groups as flavours.
+  and nothing sizeable outshines it; the photo's tapped white; white showing around the sheet
+  (bright neutral pixels in components that hug the frame, so white beans never qualify); a
+  white handed in from outside (the app passes a borrowed one); the camera's balance, or the
+  sheet's own tint if it is neutral. The last two set `calibrated: false`: the grouping is
+  unaffected, and the app says what the saved colours are measured against.
 - `coreDepth` trades splitting touching beans against cutting single beans in two.
-- Unsupported: pale beans on white paper, dark beans on a dark sheet, and speckles (body
-  colour is a trimmed median, so speckled and plain beans of one base colour group together).
+- Unsupported: beans the colour of the surface they are on (pale on white, dark on dark),
+  busy or patterned surfaces, and speckles (body colour is a trimmed median, so speckled and
+  plain beans of one base colour group together).
 - Thresholds are reasoned and tested on synthetic photos, not tuned on real ones. When a
   real photo goes wrong, reproduce it in `Synth` first.
 
@@ -77,8 +97,7 @@ It is the native successor of the `beanbox` service in the homelab repo (FastAPI
 - `Features/Shell` — tabs, `PhotoCanvas` (photo + annotations in photo pixels, taps reported in
   photo pixels), `PhotoStrip` (camera / library intake shared by the tabs).
 - `Features/Sampler` — Papers and Beans tabs (one view, two kinds).
-- `Features/Match`, `Features/Sort` (overlay, `GroupChart`), `Features/Mat` (printable dark
-  sorting mat).
+- `Features/Match`, `Features/Sort` (overlay, `GroupChart`).
 - The app target isolates to the main actor by default (`SWIFT_DEFAULT_ACTOR_ISOLATION`);
   value types and helpers used off it are marked `nonisolated`.
 - Demo scenarios (`App/DemoMode.swift`, Debug only): `-demo <name>` fills a scratch project

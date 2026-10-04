@@ -15,7 +15,6 @@ struct SortView: View {
     @State private var isolated: Int?
     @State private var picked: Int?
     @State private var names: [Int: String] = [:]
-    @State private var isShowingMat = Launch.shows("mat")
     @State private var isShowingTips = false
 
     nonisolated enum Overlay: String, CaseIterable, Identifiable, Sendable {
@@ -26,6 +25,7 @@ struct SortView: View {
     nonisolated private struct Input: Equatable, Sendable {
         var photo: UUID?
         var white: XYZ?
+        var basis: WhiteBasis?
     }
 
     private var photo: PhotoRecord? { project.photo(project.focus[.sort]) }
@@ -70,13 +70,9 @@ struct SortView: View {
             .navigationTitle("Sort")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Sorting Mat", systemImage: "printer") { isShowingMat = true }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
                     Button("Tips", systemImage: "questionmark.circle") { isShowingTips = true }
                 }
             }
-            .sheet(isPresented: $isShowingMat) { MatSheet() }
             .sheet(isPresented: $isShowingTips) {
                 NavigationStack {
                     ScrollView { SortTips().padding() }
@@ -87,8 +83,9 @@ struct SortView: View {
                 }
                 .presentationDetents([.medium, .large])
             }
-            // The tapped white matters on a dark sheet, so setting it elsewhere re-sorts.
-            .task(id: Input(photo: photo?.id, white: photo?.whiteAt == nil ? nil : photo?.white)) { await analyse() }
+            // The photo's white matters when the beans aren't on white paper, so setting it in
+            // another tab re-sorts.
+            .task(id: Input(photo: photo?.id, white: photo?.white, basis: photo?.basis)) { await analyse() }
         }
     }
 
@@ -100,7 +97,7 @@ struct SortView: View {
         isWorking = true
         defer { isWorking = false }
         guard let fresh = await project.loaded(photo) else { return }
-        let result = await Project.sort(fresh.pixels, tappedWhite: photo.whiteAt == nil ? nil : photo.white)
+        let result = await Project.sort(fresh.pixels, white: photo.white, basis: photo.basis)
         guard !Task.isCancelled else { return }
         loaded = fresh
         analysis = result
@@ -116,7 +113,7 @@ struct SortView: View {
 
     private var failure: some View {
         Label {
-            Text("Couldn’t find beans on a plain sheet. Fill the frame with one sheet — white paper for coloured or dark beans, a dark sheet for white or pale ones — and spread the beans out in a single layer.")
+            Text("Couldn’t find beans on a plain surface. Fill the frame with one surface the beans stand out from — paper, a cloth, a tray — and spread them out in a single layer.")
         } icon: {
             Image(systemName: "exclamationmark.triangle")
         }
@@ -157,24 +154,20 @@ struct SortView: View {
             note("Dashed outlines are beans too close together to pull apart, so they’re left out of the groups. Nudge them apart and retake to include them.")
         }
         if !analysis.sheet.calibrated {
-            note("There’s no white paper in this shot, so these colours are only good for sorting, not for matching to paper. To save groups as flavours, retake with a strip of white paper showing at the edge.", warning: true)
+            note(photo.basis == .borrowed
+                ? "Nothing white in this shot. The groups don’t need it; the colours you save from here are measured against your previous photo’s white."
+                : "Nothing white in this shot. The groups don’t need it; the colours you save from here are as the camera saw them, so they match best against paper measured the same way.")
         }
-        if analysis.sheet.isWhite {
-            note("A bean with no outline wasn’t seen. If it’s white or very pale, shoot those on a dark sheet instead.")
-        }
+        note("A bean with no outline wasn’t seen: it’s too close to the surface’s colour. Pale beans need a darker surface, dark beans a lighter one.")
         if overlay == .exaggerated {
             note("Exaggerated colours stretch whatever differences exist until they’re easy to see — real flavours come out as distinct blocks of colour. A smooth rainbow with no blocks means there’s only one flavour here.")
         }
     }
 
-    private func note(_ text: LocalizedStringKey, warning: Bool = false) -> some View {
-        Label {
-            Text(text)
-        } icon: {
-            Image(systemName: warning ? "exclamationmark.triangle" : "info.circle")
-        }
-        .font(.footnote)
-        .foregroundStyle(warning ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+    private func note(_ text: String) -> some View {
+        Label(text, systemImage: "info.circle")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
     }
 
     private func verdict(_ analysis: Sorting.Analysis, _ partition: Sorting.Partition) -> String {
@@ -268,20 +261,18 @@ struct SortView: View {
                     if let hint = hint(partition.centroids[group], flavors) {
                         Text(hint).font(.footnote).foregroundStyle(.secondary)
                     }
-                    if analysis.sheet.calibrated {
-                        HStack {
-                            TextField("Tasted one? Name the flavour", text: Binding(get: { names[group] ?? "" }, set: { names[group] = $0 }))
-                                .textFieldStyle(.roundedBorder)
-                                .autocorrectionDisabled()
-                                .submitLabel(.done)
-                            Button("Save") {
-                                let label = (names[group] ?? "").trimmingCharacters(in: .whitespaces)
-                                project.addFlavor(named: label, lab: partition.centroids[group], from: photo.id)
-                                names[group] = nil
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled((names[group] ?? "").trimmingCharacters(in: .whitespaces).isEmpty)
+                    HStack {
+                        TextField("Tasted one? Name the flavour", text: Binding(get: { names[group] ?? "" }, set: { names[group] = $0 }))
+                            .textFieldStyle(.roundedBorder)
+                            .autocorrectionDisabled()
+                            .submitLabel(.done)
+                        Button("Save") {
+                            let label = (names[group] ?? "").trimmingCharacters(in: .whitespaces)
+                            project.addFlavor(named: label, lab: partition.centroids[group], from: photo.id)
+                            names[group] = nil
                         }
+                        .buttonStyle(.borderedProminent)
+                        .disabled((names[group] ?? "").trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
             }
@@ -303,8 +294,9 @@ struct SortView: View {
 
 struct SortTips: View {
     private let steps = [
-        "Spread the look-alike beans on plain white printer paper, one layer, not touching. Fill the frame with the paper. Any colour family works — reds, yellows, greens, the dark ones.",
-        "White, cream or very pale beans don’t show up against white. Put those on a dark sheet with a strip of white paper showing at the edge — a black or navy origami sheet, or the printable sorting mat (the printer button above).",
+        "Spread the look-alike beans on one plain surface they stand out from, one layer, not touching, and fill the frame with it. White paper is the best choice for coloured and dark beans.",
+        "White, cream or very pale beans don’t show up against white: put those on something dark — a dark origami sheet, a tablecloth.",
+        "Nothing in the shot has to be white. If something is, the colours you save are more accurate; if not, the grouping is just as good.",
         "Shoot straight down. No flash; keep your shadow off the sheet.",
         "Every bean comes back lettered by group. Taste one bean per group to name it, then save the group as a flavour.",
         "More than three or four flavours in one pile? Split it in two, then shoot each half on its own and split again — small differences show up better once the big ones are out of the frame.",

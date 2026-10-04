@@ -113,6 +113,47 @@ import Testing
         for (a, b) in zip(reference.centroids, tapped.centroids) { #expect(ColorScience.ciede2000(a, b) < 1) }
     }
 
+    @Test func beansOnAClothWithNoWhiteAnywhereAreStillSorted() throws {
+        // A navy tablecloth filling the frame: no paper, nothing to calibrate against. The
+        // grouping must hold, the colours must stay in a sane range, and it must say so.
+        let placed = Synth.grid(Synth.reds, perFlavor: 14)
+        let result = try Sorting.analyze(Synth.render(placed, sheet: Synth.navySheet, border: 0))
+        let three = try #require(Self.expectSeparated(result, placed))
+        #expect(!result.sheet.calibrated && !result.sheet.isWhite)
+        for centroid in three.centroids {
+            #expect(centroid.x > 15 && centroid.x < 80, "lightness \(centroid.x) is out of a red bean's range")
+            #expect(centroid.y > 25, "a red bean stopped being red")
+        }
+    }
+
+    @Test func aWhiteFromAnotherPhotoCalibratesAClothShot() throws {
+        let placed = Synth.grid(Synth.reds, perFlavor: 14)
+        let onPaper = Synth.render(placed, falloff: 0)
+        let reference = try #require(Self.expectSeparated(try Sorting.analyze(onPaper), placed))
+        let borrowed = Sampling.autoWhite(onPaper).xyz
+        let result = try Sorting.analyze(Synth.render(placed, falloff: 0, sheet: Synth.navySheet, border: 0), fallbackWhite: borrowed)
+        let onCloth = try #require(Self.expectSeparated(result, placed))
+        // Still not a white of its own, but the colours now agree with the paper shot.
+        #expect(!result.sheet.calibrated)
+        for (a, b) in zip(reference.centroids, onCloth.centroids) { #expect(ColorScience.ciede2000(a, b) < 1) }
+    }
+
+    @Test func foldsAndSheenOnAClothAreNotBeans() throws {
+        // Long thin highlights across the cloth stand out from it as much as a bean does.
+        let placed = Synth.grid(Synth.reds, perFlavor: 14)
+        let found = try Sorting.segment(Synth.render(placed, sheet: Synth.navySheet, border: 0, sheen: 6), tappedWhite: nil)
+        #expect(found.beans.count == placed.count)
+        #expect(found.clumps.isEmpty)
+        _ = Self.truth(found.beans.map(\.shape), placed)
+    }
+
+    @Test func aGrainySurfaceStillWorks() throws {
+        // A wooden table: mid-brown, banded ±12 %.
+        let placed = Synth.grid(Synth.greens, perFlavor: 14)
+        let result = try Sorting.analyze(Synth.render(placed, sheet: Synth.woodSheet, border: 0, grain: 0.12))
+        Self.expectSeparated(result, placed)
+    }
+
     @Test func oneFlavourIsNotSplit() throws {
         let placed = Synth.grid([Synth.reds[0]], perFlavor: 40)
         let result = try Sorting.analyze(Synth.render(placed))

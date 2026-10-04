@@ -9,6 +9,7 @@ let package = Package(
     platforms: [.iOS("18.0"), .macOS("15.0")],
     products: [
         .library(name: "BeanCore", targets: ["BeanCore"]),
+        .executable(name: "beans", targets: ["beans"]),
     ],
     targets: [
         .target(
@@ -19,6 +20,7 @@ let package = Package(
                 .unsafeFlags(["-Ounchecked", "-wmo"], .when(configuration: .release)),
             ]
         ),
+        .executableTarget(name: "beans", dependencies: ["BeanCore"]),
         .testTarget(
             name: "BeanCoreTests",
             dependencies: ["BeanCore"],

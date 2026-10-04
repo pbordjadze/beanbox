@@ -38,6 +38,58 @@ import Testing
         #expect(yellowLab.z > 60)
     }
 
+    @Test func aPhotoWithNothingWhiteKeepsTheCamerasBalance() throws {
+        // Colour sheets on a navy cloth, no white anywhere. The brightest thing is yellow
+        // paper: it must not be mistaken for white (which would turn it grey and everything
+        // else blue), and the dark grey patch must not be either.
+        let patches: [(SIMD3<Double>, (Int, Int))] = [
+            (SIMD3(0.80, 0.60, 0.04), (200, 200)),   // yellow
+            (SIMD3(0.50, 0.03, 0.035), (500, 200)),  // red
+            (SIMD3(0.12, 0.12, 0.12), (800, 200)),   // dark grey
+        ]
+        let image = Synth.swatches(patches, cast: SIMD3(1, 1, 1), exposure: 1, background: Synth.navySheet)
+        let white = Sampling.autoWhite(image)
+        #expect(!white.found && !white.clipped)
+        // The camera's white: neutral, at the level of the brightest thing or a normal white.
+        let chromaticity = white.xyz / white.xyz.y
+        #expect(abs(chromaticity.x - ColorScience.d65.x) < 1e-9 && abs(chromaticity.z - ColorScience.d65.z) < 1e-9)
+        #expect(white.xyz.y >= Sampling.cameraWhiteFloor && white.xyz.y <= 1)
+
+        let yellow = try #require(Sampling.sample(image, white: white.xyz, x: 200, y: 200, r: 20))
+        let grey = try #require(Sampling.sample(image, white: white.xyz, x: 800, y: 200, r: 20))
+        #expect(yellow.z > 60 && yellow.x > 70 && yellow.x < 100)
+        #expect(hypot(grey.y, grey.z) < 1 && grey.x > 30 && grey.x < 55)
+    }
+
+    @Test func aWhiteBorrowedFromThePreviousPhotoCarriesItsCalibration() throws {
+        // Same warm light, same exposure: one shot of the swatches on white paper, one on a
+        // navy cloth with no white. Measured against the first shot's white, the second
+        // shot's colours come out the same.
+        let warm = SIMD3(1.0, 0.82, 0.60)
+        let onPaper = Synth.swatches(Self.patches, cast: warm, exposure: 0.8)
+        let onCloth = Synth.swatches(Self.patches, cast: warm, exposure: 0.8, background: Synth.navySheet)
+        let reference = Sampling.autoWhite(onPaper)
+        #expect(reference.found && !Sampling.autoWhite(onCloth).found)
+        let borrowed = Sampling.borrowedWhite(for: onCloth, from: reference.xyz)
+        for (_, (x, y)) in Self.patches {
+            let a = try #require(Sampling.sample(onPaper, white: reference.xyz, x: Double(x), y: Double(y), r: 20))
+            let b = try #require(Sampling.sample(onCloth, white: borrowed, x: Double(x), y: Double(y), r: 20))
+            #expect(ColorScience.ciede2000(a, b) < 0.5)
+            // Left to the camera's balance instead, the warm cast stays in every colour:
+            // several ΔE off, where the borrowed white is exact.
+            let unbalanced = try #require(Sampling.sample(onCloth, white: Sampling.autoWhite(onCloth).xyz, x: Double(x), y: Double(y), r: 20))
+            #expect(ColorScience.ciede2000(a, unbalanced) > 3)
+        }
+    }
+
+    @Test func aBorrowedWhiteIsRaisedWhenThePhotoOutshinesIt() {
+        let dim = XYZ(0.19, 0.2, 0.21)
+        let image = Synth.swatches([(SIMD3(0.80, 0.60, 0.04), (500, 200))], cast: SIMD3(1, 1, 1), exposure: 1, half: 200, background: Synth.navySheet)
+        let borrowed = Sampling.borrowedWhite(for: image, from: dim)
+        #expect(borrowed.y > 0.5)
+        #expect(abs(borrowed.x / borrowed.y - dim.x / dim.y) < 1e-12)
+    }
+
     @Test func overexposedWhiteIsFlagged() {
         let blown = PixelImage(width: 64, height: 64, space: .sRGB, rgba: [UInt8](repeating: 255, count: 64 * 64 * 4))
         #expect(Sampling.autoWhite(blown).clipped)

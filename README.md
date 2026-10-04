@@ -12,15 +12,17 @@ It answers two questions from photos, entirely on the device:
 
 ## How it works
 
-- **Measuring.** Each photo is balanced against the white paper in it (one tap), so colours
-  from photos taken at different moments are comparable. Colours are CIELAB; iPhone photos are
-  read as Display P3, so saturated reds aren't clipped before they are measured.
+- **Measuring.** Each photo is balanced against something white in it — a tap on white paper
+  is best — so colours from photos taken at different moments are comparable. A photo with
+  nothing white borrows the white of the photo before it, or falls back on the camera's own
+  balance. Colours are CIELAB; iPhone photos are read as Display P3, so saturated reds aren't
+  clipped before they are measured.
 - **Matching.** One sheet per flavour by the assignment (Hungarian) method over squared
   CIEDE2000, with lightness half-weighted. Lock the pairs you fold; the rest re-solves.
-- **Sorting.** The photo is flat-fielded against the sheet the beans lie on, every bean is
-  segmented and measured, and the beans are clustered. An exaggerated-colour view and a scatter
-  plot show whether the groups are real. White and cream beans go on a dark sheet (the app
-  prints one) with some white paper showing.
+- **Sorting.** The photo is flat-fielded against whatever plain surface the beans lie on —
+  paper, a cloth, a table — every bean is segmented and measured, and the beans are clustered.
+  An exaggerated-colour view and a scatter plot show whether the groups are real. White and
+  cream beans need a dark surface to be seen.
 
 ## Install with SideStore
 
@@ -41,6 +43,7 @@ No accounts, no analytics, no network code. Photos and measurements stay on the 
 | `Sources/BeanCore` | Colour maths, sampling, matching and the sorter: pure Swift, no dependencies |
 | `Tests/BeanCoreTests` | Swift Testing suite, run on Linux and macOS |
 | `App/` | Xcode project: the SwiftUI app |
+| `Sources/beans` | Headless CLI for trying the core on real photos: `beans white\|sample\|sort photo.ppm` |
 | `tools/` | `swift.sh` (Swift in Docker), the icon generator |
 | `ci/`, `.github/workflows/` | CI: Linux core tests, macOS build with simulator screenshots, SideStore builds |
 

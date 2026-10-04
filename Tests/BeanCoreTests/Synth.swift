@@ -38,6 +38,7 @@ enum Synth {
     static let whites: Family = [("coconut", SIMD3(0.84, 0.83, 0.80)), ("vanilla", SIMD3(0.80, 0.74, 0.58)), ("soda", SIMD3(0.70, 0.68, 0.64))]
     static let blackSheet = SIMD3(0.030, 0.030, 0.034)
     static let navySheet = SIMD3(0.030, 0.045, 0.130)
+    static let woodSheet = SIMD3(0.25, 0.14, 0.07)
     static let warmLight = SIMD3(1.0, 0.88, 0.70)
 
     struct Placed {
@@ -78,11 +79,13 @@ enum Synth {
 
     /// Beans under warm, uneven light, with shadows and glints. They lie on white paper, or —
     /// when `sheet` is given — on a coloured sheet laid on the white paper with `border` px
-    /// of white showing around it (0 for none).
+    /// of white showing around it (0 for none). The surface can be made less than plain:
+    /// `grain` is the depth of a wavy wood-like banding (0.12 = ±12 %), and `sheen` a number
+    /// of long thin highlights three times the surface's brightness, like folds in a cloth.
     static func render(
         _ placed: [Placed], width w: Int = 1200, height h: Int = 900, cast: SIMD3<Double> = warmLight,
         falloff: Double = 0.45, jitter: Double = 0.03, seed: UInt64 = 0,
-        sheet: SIMD3<Double>? = nil, border: Int = 50
+        sheet: SIMD3<Double>? = nil, border: Int = 50, grain: Double = 0, sheen: Int = 0
     ) -> PixelImage {
         var rng = SplitMix64(state: seed &+ 7)
         var image = [SIMD3<Double>](repeating: SIMD3(repeating: paper), count: w * h)
@@ -90,6 +93,22 @@ enum Synth {
             for y in border..<(h - border) {
                 for x in border..<(w - border) { image[y * w + x] = sheet }
             }
+        }
+        if grain > 0 {
+            for y in 0..<h {
+                for x in 0..<w {
+                    image[y * w + x] *= 1 + grain * sin(Double(y) * 0.35 + 3 * sin(Double(x) * 0.02))
+                }
+            }
+        }
+        var folds = SplitMix64(state: seed &+ 99)
+        for _ in 0..<sheen {
+            // Between the rows of beans, so the test is about the surface, not about overlap.
+            let row = Int(folds.uniform(0, 5))
+            fillEllipse(
+                &image, width: w, height: h, cx: folds.uniform(300, Double(w) - 300), cy: 145 + Double(row) * 90,
+                rx: folds.uniform(120, 260), ry: 5, angle: folds.uniform(-4, 4)
+            ) { $0 *= 3 }
         }
         let rx = 26.0, ry = 16.0
         var shadow = [SIMD3<Double>](repeating: SIMD3(repeating: 0), count: w * h)
@@ -122,12 +141,13 @@ enum Synth {
         return UInt8(e * 255 + 0.5)
     }
 
-    /// Flat coloured squares on white paper under the given light: `(colour, centre)`.
+    /// Flat coloured squares under the given light: `(colour, centre)`. They lie on white
+    /// paper unless another `background` is given.
     static func swatches(
         _ patches: [(SIMD3<Double>, (Int, Int))], width w: Int = 1000, height h: Int = 400,
-        cast: SIMD3<Double>, exposure: Double, half: Int = 80
+        cast: SIMD3<Double>, exposure: Double, half: Int = 80, background: SIMD3<Double>? = nil
     ) -> PixelImage {
-        var image = [SIMD3<Double>](repeating: SIMD3(repeating: paper), count: w * h)
+        var image = [SIMD3<Double>](repeating: background ?? SIMD3(repeating: paper), count: w * h)
         for (color, (cx, cy)) in patches {
             for y in max(0, cy - half)..<min(h, cy + half) {
                 for x in max(0, cx - half)..<min(w, cx + half) { image[y * w + x] = color }

@@ -42,8 +42,16 @@ final class Project {
     init(root: URL) {
         self.root = root
         try? FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
-        if let saved = try? Data(contentsOf: fileURL), let decoded = try? JSONDecoder().decode(ProjectData.self, from: saved) {
-            data = decoded
+        if let saved = try? Data(contentsOf: fileURL) {
+            if let decoded = try? JSONDecoder().decode(ProjectData.self, from: saved) {
+                data = decoded
+            } else {
+                // Never start over on top of a file this build can't read: the next save
+                // would replace it. Set it aside, where a later build can still find it.
+                let aside = root.appending(path: "project-unreadable-\(Int(Date().timeIntervalSince1970)).json")
+                try? FileManager.default.moveItem(at: fileURL, to: aside)
+                problem = "Your saved measurements couldn’t be read, so this starts empty. The old file was kept."
+            }
         }
         let urls = data.photos.map { ($0.id, url(of: $0.id)) }
         Task { [weak self] in
@@ -138,9 +146,10 @@ final class Project {
             problem = "That file isn’t a photo this app can read."
             return nil
         }
+        let white = automaticWhite(imported.white, for: imported.photo.pixels, at: Date(), excluding: nil)
         let record = PhotoRecord(
             width: imported.photo.pixels.width, height: imported.photo.pixels.height,
-            white: imported.white.xyz, whiteAt: nil, whiteClipped: imported.white.clipped)
+            white: white.xyz, whiteAt: nil, whiteClipped: imported.white.clipped, whiteBasis: white.basis)
         do {
             try fileData.write(to: url(of: record.id), options: .atomic)
         } catch {
@@ -154,6 +163,23 @@ final class Project {
         problem = nil
         save()
         return record
+    }
+
+    /// How long a photo's white stays good for the photos after it: about one sitting.
+    private static let sameSitting: TimeInterval = 2 * 60 * 60
+
+    /// The white for a photo nobody has tapped: what was found in it; failing that, the
+    /// white of the last photo that had one, if it was added in the same sitting (same
+    /// light, presumably); failing that, the camera's own balance.
+    private func automaticWhite(
+        _ guess: Sampling.White, for pixels: PixelImage, at date: Date, excluding photo: UUID?
+    ) -> (xyz: XYZ, basis: WhiteBasis) {
+        if guess.found { return (guess.xyz, .found) }
+        let reference = data.photos
+            .filter { $0.id != photo && $0.basis.isMeasured && $0.created <= date && date.timeIntervalSince($0.created) < Self.sameSitting }
+            .max { $0.created < $1.created }
+        if let reference { return (Sampling.borrowedWhite(for: pixels, from: reference.white), .borrowed) }
+        return (guess.xyz, .camera)
     }
 
     /// Deletes a photo. Colours already measured from it are kept.
@@ -174,20 +200,25 @@ final class Project {
     /// when nil — and re-measures every colour tapped in it.
     func setWhite(of id: UUID, pixels: PixelImage, at point: CGPoint?, radius: Double) {
         guard let index = data.photos.firstIndex(where: { $0.id == id }) else { return }
-        let white: Sampling.White
+        let white: XYZ
         if let point {
             guard let tapped = Sampling.white(in: pixels, x: point.x, y: point.y, r: radius) else { return }
-            white = tapped
+            white = tapped.xyz
             data.photos[index].whiteAt = SIMD2(point.x, point.y)
+            data.photos[index].whiteClipped = tapped.clipped
+            data.photos[index].whiteBasis = .tapped
         } else {
-            white = Sampling.autoWhite(pixels)
+            let guess = Sampling.autoWhite(pixels)
+            let automatic = automaticWhite(guess, for: pixels, at: data.photos[index].created, excluding: id)
+            white = automatic.xyz
             data.photos[index].whiteAt = nil
+            data.photos[index].whiteClipped = guess.clipped
+            data.photos[index].whiteBasis = automatic.basis
         }
-        data.photos[index].white = white.xyz
-        data.photos[index].whiteClipped = white.clipped
+        data.photos[index].white = white
         for i in data.samples.indices where data.samples[i].photoID == id {
             guard let tap = data.samples[i].tap,
-                  let lab = Sampling.sample(pixels, white: white.xyz, x: tap.x, y: tap.y, r: tap.r) else { continue }
+                  let lab = Sampling.sample(pixels, white: white, x: tap.x, y: tap.y, r: tap.r) else { continue }
             data.samples[i].lab = lab
         }
         save()
@@ -300,9 +331,12 @@ final class Project {
         return context.makeImage()
     }
 
-    /// Runs the sorter on a photo, off the main thread.
+    /// Runs the sorter on a photo, off the main thread. The photo's white only matters when
+    /// the beans aren't on white paper: a tapped one is used as is, a borrowed one stands in
+    /// when the shot turns out to have no white of its own.
     @concurrent
-    static func sort(_ pixels: PixelImage, tappedWhite: XYZ?) async -> Sorting.Analysis? {
-        try? Sorting.analyze(pixels, tappedWhite: tappedWhite)
+    static func sort(_ pixels: PixelImage, white: XYZ, basis: WhiteBasis) async -> Sorting.Analysis? {
+        try? Sorting.analyze(
+            pixels, tappedWhite: basis == .tapped ? white : nil, fallbackWhite: basis == .borrowed ? white : nil)
     }
 }

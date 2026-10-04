@@ -15,7 +15,8 @@ import UniformTypeIdentifiers
 /// Debug builds only: the demo types are compiled out of Release builds, so a shipped app has
 /// no launch argument that swaps its content (`ci/check_release.sh` checks).
 enum DemoMode {
-    /// The requested scenario, e.g. "papers", "match", "sort-dark".
+    /// The requested scenario, e.g. "papers", "match", "sort-dark". A name containing
+    /// "cloth" puts everything on a navy tablecloth with nothing white in the shot.
     static let scenario: String? = UserDefaults.standard.string(forKey: "demo")
 
     static var isActive: Bool { scenario != nil }
@@ -41,8 +42,15 @@ enum DemoData {
             if !scenario.contains("empty") { await measurePapersAndBeans(project) }
         }
         if scenario.hasPrefix("sort") && !scenario.contains("empty") {
-            let dark = scenario.contains("dark")
-            let photo = DemoPhotos.beans(dark ? DemoPhotos.whites : DemoPhotos.reds, sheet: dark ? DemoPhotos.blackSheet : nil)
+            let photo: Data
+            if scenario.contains("dark") {
+                // Pale beans on a dark sheet, with the white paper under it showing around it.
+                photo = DemoPhotos.beans(DemoPhotos.whites, sheet: DemoPhotos.blackSheet, border: 45)
+            } else if scenario.contains("cloth") {
+                photo = DemoPhotos.beans(DemoPhotos.reds, sheet: DemoPhotos.navyCloth, border: 0)
+            } else {
+                photo = DemoPhotos.beans(DemoPhotos.reds, sheet: nil, border: 0)
+            }
             await project.addPhoto(photo, for: .sort)
             // SortView marks the scenario ready once its analysis is on screen.
             return
@@ -51,10 +59,13 @@ enum DemoData {
     }
 
     private static func measurePapersAndBeans(_ project: Project) async {
-        guard let photo = await project.addPhoto(DemoPhotos.fan(), for: .papers),
+        let onCloth = DemoMode.has("cloth")
+        guard let photo = await project.addPhoto(DemoPhotos.fan(on: onCloth ? DemoPhotos.navyCloth : nil), for: .papers),
               let loaded = await project.loaded(photo) else { return }
         let radius = SampleSize.medium.fraction * Double(max(photo.width, photo.height))
-        project.setWhite(of: photo.id, pixels: loaded.pixels, at: CGPoint(x: 450, y: 1120), radius: radius)
+        if !onCloth {
+            project.setWhite(of: photo.id, pixels: loaded.pixels, at: CGPoint(x: 450, y: 1120), radius: radius)
+        }
         guard let balanced = project.photo(photo.id) else { return }
         for i in DemoPhotos.sheets.indices {
             project.addSample(.paper, in: balanced, pixels: loaded.pixels, at: CGPoint(x: 100 + i * 62, y: 600), radius: radius, label: nil)
@@ -79,6 +90,7 @@ enum DemoPhotos {
     static let reds: [RGB] = [RGB(0.50, 0.030, 0.035), RGB(0.42, 0.022, 0.060), RGB(0.56, 0.060, 0.030)]
     static let whites: [RGB] = [RGB(0.84, 0.83, 0.80), RGB(0.80, 0.74, 0.58), RGB(0.70, 0.68, 0.64)]
     static let blackSheet = RGB(0.030, 0.030, 0.034)
+    static let navyCloth = RGB(0.030, 0.045, 0.130)
     static let sheets: [RGB] = [
         RGB(0.80, 0.14, 0.02), RGB(0.78, 0.10, 0.03), RGB(0.16, 0.36, 0.03), RGB(0.22, 0.42, 0.10),
         RGB(0.60, 0.40, 0.02), RGB(0.75, 0.55, 0.05), RGB(0.04, 0.04, 0.09), RGB(0.03, 0.05, 0.16),
@@ -101,10 +113,10 @@ enum DemoPhotos {
         mutating func noise() -> Double { (next() - 0.5) * 3.4641 }
     }
 
-    /// A fan of coloured sheets on white paper, 900 × 1200.
-    static func fan() -> Data {
+    /// A fan of coloured sheets on white paper, or on `surface`, 900 × 1200.
+    static func fan(on surface: RGB? = nil) -> Data {
         let w = 900, h = 1200
-        var image = [RGB](repeating: RGB(repeating: paper), count: w * h)
+        var image = [RGB](repeating: surface ?? RGB(repeating: paper), count: w * h)
         for (i, color) in sheets.enumerated() {
             let x0 = 70 + i * 62
             for y in (180 + i * 18)..<(1000 + i * 6) {
@@ -114,15 +126,15 @@ enum DemoPhotos {
         return jpeg(lit(image, w, h, seed: 1), w, h)
     }
 
-    /// Thirty-six beans of three look-alike flavours, on white paper or on a dark sheet with
-    /// white paper showing around it, 900 × 1200.
-    static func beans(_ flavors: [RGB], sheet: RGB?) -> Data {
+    /// Thirty-six beans of three look-alike flavours, 900 × 1200: on white paper, or on a
+    /// `sheet` with `border` pixels of the white paper under it showing around it.
+    static func beans(_ flavors: [RGB], sheet: RGB?, border: Int) -> Data {
         let w = 900, h = 1200
         var rng = Generator(state: 11)
         var image = [RGB](repeating: RGB(repeating: paper), count: w * h)
         if let sheet {
-            for y in 45..<(h - 45) {
-                for x in 45..<(w - 45) { image[y * w + x] = sheet }
+            for y in border..<(h - border) {
+                for x in border..<(w - border) { image[y * w + x] = sheet }
             }
         }
         func ellipse(_ cx: Double, _ cy: Double, _ rx: Double, _ ry: Double, _ angle: Double, _ paint: (inout RGB) -> Void) {
